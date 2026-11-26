@@ -308,8 +308,8 @@ window.HOS_CONFIG = {
     portal: ''               // lien du portail client Stripe
   },
   // Mode partagé (comptes + base commune). Supabase > Project Settings > API
-  supabaseUrl: '',           // ex. https://abcdxyz.supabase.co
-  supabaseKey: '',           // clé "anon public" (jamais la clé service_role)
+  supabaseUrl: 'https://wqmdafuoarduohggypld.supabase.co',
+  supabaseKey: 'sb_publishable_3EI6TxNeoJE-4_8LRF2oVg_OU7MDXFS',   // clé publique (jamais la clé secret ni service_role)
   aiEnabled: false           // true une fois la fonction "assistant" déployée (voir le guide)
 };
 </script>
@@ -620,6 +620,7 @@ window.HOS_CONFIG = {
    Active uniquement si supabaseUrl et supabaseKey sont renseignés dans HOS_CONFIG. */
 (function(){
   var C=window.HOS_CONFIG||{};
+  C.supabaseUrl=String(C.supabaseUrl||'').replace(/\/rest\/v1\/?$/,'').replace(/\/+$/,'');
   var CL=window.HOS_CLOUD={configured:!!(C.supabaseUrl&&C.supabaseKey),ready:false,user:null,plan:'free',status:'',data:null,profile:null};
   if(!CL.configured)return;
   var sb=null,timer=null;
@@ -704,18 +705,25 @@ window.HOS_CONFIG = {
   CL.refresh=refresh;
 
   CL.init=function(){
-    var s=document.createElement('script');
-    s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js';
-    s.onload=function(){
+    // Deux versions de la bibliothèque : la récente (acceptée par les clés « sb_publishable_ »), puis l'ancienne en secours.
+    var V=['2.110.1','2.45.4'],i=0;
+    function start(){
       sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey,{auth:{persistSession:true,detectSessionInUrl:true}});
       sb.auth.onAuthStateChange(function(ev,session){
         CL.user=session?session.user:null;
         if(CL.user){CL.ready=true;refresh();clearInterval(timer);timer=setInterval(function(){if(!document.hidden)refresh()},45000)}
         else{clearInterval(timer);CL.ready=true;if(window.HOS_onCloud)window.HOS_onCloud()}
       });
-    };
-    s.onerror=function(){CL.configured=false;toast('Supabase indisponible : mode local')};
-    document.head.appendChild(s);
+    }
+    function load(){
+      var s=document.createElement('script');
+      s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@'+V[i]+'/dist/umd/supabase.js';
+      s.onload=function(){if(window.supabase&&window.supabase.createClient)start();else next()};
+      s.onerror=next;
+      document.head.appendChild(s);
+    }
+    function next(){i++;if(i<V.length)load();else{CL.configured=false;toast('Supabase indisponible : mode local')}}
+    load();
   };
 })();
 </script>
